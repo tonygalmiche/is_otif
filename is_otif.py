@@ -9,6 +9,20 @@ from tools.translate import _
 import netsvc
 
 
+
+# Retourne True si la catégorie parent est "HORS FAMILLE PRODUIT" (id=9)
+def TestCategorie(self, cr, uid, cat):
+    parent_id=cat.parent_id
+    id=""
+    while True:
+        if str(parent_id)=="": break
+        id=parent_id.id
+        parent_id=parent_id.parent_id
+    test=False
+    if id==9: test=True
+    return test
+
+
 class is_otif_cause(osv.osv):
     _name = 'is.otif.cause'
     _description = 'Liste des anomalies'
@@ -30,6 +44,12 @@ class is_otif(osv.osv):
         is_anomalie=False
         decaled_order=0
         for obj in self.browse(cr, uid, ids, context=context):
+
+            cat=obj.order_line_id.product_id.categ_id
+            test=TestCategorie(self, cr, uid, cat)
+            print str(cat)
+            print "test="+str(test)
+
             if obj.final_date:
                 if obj.initial_qty != obj.qty_delivered:
                     anomalie="Anomalie Qt"
@@ -117,6 +137,19 @@ class sale_order(osv.osv):
         'nb_confirmed': 0,
     }
 
+
+    def copy_data(self, cr, uid, id, default=None, context=None):
+        if default is None:
+            default = {}
+        default.update({
+            'nb_confirmed': False,
+        })
+        return super(sale_order, self).copy_data(cr, uid, id, default=default, context=context)
+
+
+
+
+
     #Le nouveau champ 'nb_confirmed' permet de savoir si la commande a déjà été validée ou pas
     #-> Il ne faut pas enregistrer une deuxième fois une commande déjà validée même si elle contient d'autres lignes
     def action_wait(self, cr, uid, ids, *args):
@@ -151,28 +184,31 @@ class sale_order_line(osv.osv):
         if not self.is_product_tr(cr, uid, line.product_id.default_code, context): #or self.is_order_ec(cr, uid, line.order_id.sale_oder_type, context):
             #Ne pas prendre en compte les échantillions
             if line.order_id.sale_order_type!="sample":
-                vals = {
-                    'order_id': line.order_id.id,
-                    'order_line_id': line.id,
-                    'order_date': line.order_id.date_order,
-                    'order_time': time.strftime('%H:%M:%S', (time.strptime(line.order_id.create_date, '%Y-%m-%d %H:%M:%S'))), # A convertir en time
-                    'partner_id': line.order_partner_id.id,
-                    'partner_classification': line.order_partner_id.classification,
-                    'company_code': line.order_id.section_id.code,
-                    'product_code': line.product_id.default_code,
-                    'product_name': line.product_id.name,
-                    'produce_delay': line.produce_delay,
-                    'initial_qty': line.product_uom_qty,
-                    'initial_date': line.order_id.date_depart,
+                cat=line.product_id.categ_id
+                test=TestCategorie(self, cr, uid, cat)
+                if test==False:
+                    vals = {
+                        'order_id': line.order_id.id,
+                        'order_line_id': line.id,
+                        'order_date': line.order_id.date_order,
+                        'order_time': time.strftime('%H:%M:%S', (time.strptime(line.order_id.create_date, '%Y-%m-%d %H:%M:%S'))), # A convertir en time
+                        'partner_id': line.order_partner_id.id,
+                        'partner_classification': line.order_partner_id.classification,
+                        'company_code': line.order_id.section_id.code,
+                        'product_code': line.product_id.default_code,
+                        'product_name': line.product_id.name,
+                        'produce_delay': line.produce_delay,
+                        'initial_qty': line.product_uom_qty,
+                        'initial_date': line.order_id.date_depart,
 
-                    'blocage_total': line.order_partner_id.eg_waiting_payment,
-                    'blocage_production': line.order_partner_id.eg_waiting_no_production,
-                    'blocage_exped': line.order_partner_id.eg_waiting_no_delivering,
+                        'blocage_total': line.order_partner_id.eg_waiting_payment,
+                        'blocage_production': line.order_partner_id.eg_waiting_no_production,
+                        'blocage_exped': line.order_partner_id.eg_waiting_no_delivering,
 
-                    'waiting_panif': line.eg_waiting_panif,
-                    'waiting_quality': line.eg_waiting_quality,
-                }
-                new_id = otif_obj.create(cr, 1, vals, context=context)
+                        'waiting_panif': line.eg_waiting_panif,
+                        'waiting_quality': line.eg_waiting_quality,
+                    }
+                    new_id = otif_obj.create(cr, 1, vals, context=context)
         return True
 
     #Lors de la première validation de la commande, il faut enregistrer les lignes dans OTIF
@@ -237,6 +273,7 @@ class stock_picking(osv.osv):
             otif_obj.write(cr, uid, otif_id, vals, context=context)
         else:
             move = move_obj.browse(cr, uid, move_id, context=context)
+
             vals.update({
                         'order_id': move.sale_line_id.order_id.id,
                         'order_line_id': move.sale_line_id.id,
@@ -253,11 +290,14 @@ class stock_picking(osv.osv):
             # sale_order_type = sale_line_id and order_line_obj.browse(cr, uid, sale_line_id, context=context).order_id.sale_order_type or False
             if not order_line_obj.is_product_tr(cr, uid, move.product_id.default_code, context): #or order_line_obj.is_order_ec(cr, uid, sale_order_type, context):
                 if move.sale_line_id.order_id.sale_order_type!="sample":
-                    otif_id = otif_obj.create(cr, uid, vals, context=context)
-                    #Recherche des anomalies après la création
-                    if (otif_id):
-                        otif_obj.write(cr, uid, otif_id, vals, context=context)
-                    create_from_move = True
+                    cat=move.sale_line_id.product_id.categ_id
+                    test=TestCategorie(self, cr, uid, cat)
+                    if test==False:
+                        otif_id = otif_obj.create(cr, uid, vals, context=context)
+                        #Recherche des anomalies après la création
+                        if (otif_id):
+                            otif_obj.write(cr, uid, otif_id, vals, context=context)
+                        create_from_move = True
 
         return True
 
@@ -270,12 +310,14 @@ class stock_picking(osv.osv):
         otif_obj = self.pool.get('is.otif')
         for picking in self.browse(cr, uid, ids, context=context):
             for move in picking.move_lines:
-                sale_line_id=move.sale_line_id.id
-                qty_delivered=0
-                if move.delivery_state=='delivered':
-                    qty_delivered=move.product_qty
-                final_date=move.sale_line_id.order_id.date_order,
-                self.update_line_otif(cr, uid, sale_line_id, move.id, final_date, qty_delivered, context=context)
+                #Si le champ sale_line_id n'est pas renseigné ce n'est pas une livraison, mais un retour
+                if move.sale_line_id:
+                    sale_line_id=move.sale_line_id.id
+                    qty_delivered=0
+                    if move.delivery_state=='delivered':
+                        qty_delivered=move.product_qty
+                    final_date=move.sale_line_id.order_id.date_order,
+                    self.update_line_otif(cr, uid, sale_line_id, move.id, final_date, qty_delivered, context=context)
         res = super(stock_picking, self).action_done_picking_out(cr, uid, ids, context=context)
         return res
 
@@ -286,12 +328,14 @@ class stock_picking(osv.osv):
         otif_obj = self.pool.get('is.otif')
         for picking in self.browse(cr, uid, ids, context=context):
             for move in picking.move_lines:
-                sale_line_id=move.sale_line_id.id
-                qty_delivered=0
-                if move.delivery_state=='delivered':
-                    qty_delivered=move.product_qty
-                final_date=move.sale_line_id.order_id.date_order,
-                self.update_line_otif(cr, uid, sale_line_id, move.id, final_date, qty_delivered, context=context)
+                #Si le champ sale_line_id n'est pas renseigné ce n'est pas une livraison, mais une réception
+                if move.sale_line_id:
+                    sale_line_id=move.sale_line_id.id
+                    qty_delivered=0
+                    if move.delivery_state=='delivered':
+                        qty_delivered=move.product_qty
+                    final_date=move.sale_line_id.order_id.date_order,
+                    self.update_line_otif(cr, uid, sale_line_id, move.id, final_date, qty_delivered, context=context)
         res = super(stock_picking, self).action_process(cr, uid, ids, context=context)
         return res
 

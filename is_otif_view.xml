@@ -42,6 +42,35 @@
 
 
 
+        <record id="view_is_otif_search" model="ir.ui.view">
+            <field name="name">view_is_otif_search</field>
+            <field name="model">is.otif</field>
+            <field name="type">search</field>
+            <field name="arch" type="xml">
+                <search>
+
+                    <filter icon="terp-check" name="anomalie_otif" string="Anomalie" domain="[('is_anomalie','=',True)]" />
+                    <separator orientation="vertical"/>
+
+                    <field name="order_id" select="1"/>
+                    <field name="order_date" />
+                    <field name="partner_id"/>
+                    <field name="is_anomalie"/>
+                    <field name="anomalie"/>
+                    <newline/>
+                    <group expand="1" string="Group By..." colspan="11" col="11" groups="base.group_extended">
+                        <filter string="Anomalie" icon="terp-check" domain="[]" context="{'group_by':'is_anomalie'}"/>
+                        <filter string="Commande" icon="terp-gtk-jump-to-rtl" domain="[]" context="{'group_by':'order_id'}"/>
+                        <filter string="Client"   icon="terp-personal" domain="[]" context="{'group_by':'partner_id'}"/>
+                    </group>
+               </search>
+            </field>
+        </record>
+
+
+
+
+
 
         <record id="view_is_otif_tree" model="ir.ui.view">
             <field name="name">is.otif.tree</field>
@@ -49,26 +78,50 @@
             <field name="type">tree</field>
             <field name="arch" type="xml">
                 <tree string="Analyses OTIF" >
-                    <field name="order_date"/>
-                    <field name="order_time"/>
+
                     <field name="order_id"/>
                     <field name="order_line_id"/>
+                    <field name="order_date"/>
+                    <field name="order_time"/>
                     <field name="partner_id"/>
-                    <!--<field name="partner_classification"/>
-                    <field name="product_code" />
-                    <field name="product_name" />-->
-
-                    <field name="initial_date" />
-                    <field name="final_date" />
-
-                    <field name="initial_qty" />
-                    <field name="qty_delivered" />
-
-                    <field name="is_anomalie" />
-                    <field name="anomalie" />
+                    <field name="partner_classification"/>
+                    <field name="company_code"/>
+                    <field name="product_code"/>
+                    <field name="product_name"/>
+                    <field name="produce_delay"/>
+                    <field name="initial_qty"/>
+                    <field name="qty_delivered"/>
+                    <field name="initial_date"/>
+                    <field name="final_date"/>
+                    <field name="cause_id"/>
+                    <field name="cost"/>
+                    <field name="waiting_panif"/>
+                    <field name="waiting_panif_date"/>
+                    <field name="waiting_quality"/>
+                    <field name="waiting_quality_date"/>
+                    <field name="blocage_total"/>
+                    <field name="date_blocage_total"/>
+                    <field name="blocage_production"/>
+                    <field name="date_blocage_prod"/>
+                    <field name="blocage_exped"/>
+                    <field name="date_blocage_exped"/>
+                    <field name="decaled_order"/>
+                    <field name="scind_cmd"/>
+                    <field name="sold_cmd"/>
+                    <field name="production_date"/>
+                    <field name="production_num"/>
+                    <field name="initial_production_date"/>
+                    <field name="final_production_date"/>
+                    <field name="control"/>
+                    <field name="control_delay"/>
+                    <field name="control_product_date"/>
+                    <field name="is_anomalie"/>
+                    <field name="anomalie"/>
                 </tree>
             </field>
         </record>
+
+
 
         <record id="view_is_otif_form" model="ir.ui.view">
             <field name="name">is.otif.form</field>
@@ -160,6 +213,8 @@
             <field name="name">Analyses OTIF</field>
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">is.otif</field>
+            <field name="context">{'search_default_anomalie_otif':1}</field>
+            <field name="domain">[]</field>
             <field name="view_type">form</field>
             <field name="view_mode">tree,form</field>
         </record>
