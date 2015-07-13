@@ -44,12 +44,8 @@ class is_otif(osv.osv):
         is_anomalie=False
         decaled_order=0
         for obj in self.browse(cr, uid, ids, context=context):
-
-            cat=obj.order_line_id.product_id.categ_id
-            test=TestCategorie(self, cr, uid, cat)
-            print str(cat)
-            print "test="+str(test)
-
+            #cat=obj.order_line_id.product_id.categ_id
+            #test=TestCategorie(self, cr, uid, cat)
             if obj.final_date:
                 if obj.initial_qty != obj.qty_delivered:
                     anomalie="Anomalie Qt"
@@ -85,10 +81,10 @@ class is_otif(osv.osv):
         'product_code': fields.char('Product Code', size=256, readonly=True),
         'product_name': fields.char('Product Name', size=256, readonly=True),
         'produce_delay': fields.float('Production Delay', readonly=True),
-        'initial_qty': fields.float('Initial Quantity', readonly=False),
-        'qty_delivered': fields.float('Quantity Delivered', readonly=False),
-        'initial_date': fields.date('Initial shipping date', readonly=False),
-        'final_date': fields.date('Final shipping date', readonly=False),
+        'initial_qty': fields.float('Initial Quantity', readonly=True),
+        'qty_delivered': fields.float('Quantity Delivered', readonly=True),
+        'initial_date': fields.date('Initial shipping date', readonly=True),
+        'final_date': fields.date('Final shipping date', readonly=True),
         'cause_id': fields.many2one('is.otif.cause', 'Cause'),
         'comment': fields.text('Comment'),
         'cost': fields.char('Cost', size=256, readonly=False),
@@ -201,9 +197,15 @@ class sale_order_line(osv.osv):
                         'initial_qty': line.product_uom_qty,
                         'initial_date': line.order_id.date_depart,
 
-                        'blocage_total': line.order_partner_id.eg_waiting_payment,
-                        'blocage_production': line.order_partner_id.eg_waiting_no_production,
-                        'blocage_exped': line.order_partner_id.eg_waiting_no_delivering,
+                        #'blocage_total': line.order_partner_id.eg_waiting_payment,
+                        #'blocage_production': line.order_partner_id.eg_waiting_no_production,
+                        #'blocage_exped': line.order_partner_id.eg_waiting_no_delivering,
+
+                        'blocage_total': line.order_id.waiting_payment,
+                        'blocage_production': line.order_id.production_freeze,
+                        'blocage_exped': line.order_id.eg_waiting_delivery,
+
+
 
                         'waiting_panif': line.eg_waiting_panif,
                         'waiting_quality': line.eg_waiting_quality,
@@ -285,7 +287,12 @@ class stock_picking(osv.osv):
                         'product_code': move.product_id.default_code,
                         'product_name': move.product_id.name,
                         'initial_qty': 0,
-                        'initial_date': move.sale_line_id.order_id.date_depart
+                        'initial_date': move.sale_line_id.order_id.date_depart,
+
+                        'blocage_total': move.sale_line_id.order_id.waiting_payment,
+                        'blocage_production': move.sale_line_id.order_id.production_freeze,
+                        'blocage_exped': move.sale_line_id.order_id.eg_waiting_delivery,
+
                 })
             # sale_order_type = sale_line_id and order_line_obj.browse(cr, uid, sale_line_id, context=context).order_id.sale_order_type or False
             if not order_line_obj.is_product_tr(cr, uid, move.product_id.default_code, context): #or order_line_obj.is_order_ec(cr, uid, sale_order_type, context):
@@ -338,6 +345,39 @@ class stock_picking(osv.osv):
                     self.update_line_otif(cr, uid, sale_line_id, move.id, final_date, qty_delivered, context=context)
         res = super(stock_picking, self).action_process(cr, uid, ids, context=context)
         return res
-
-
 stock_picking()
+
+
+
+#Gestion du déblocage des commandes
+class sale_order_blocking_history(osv.osv):
+    _inherit = 'sale.order.blocking.history'
+
+    def write(self, cr, uid, ids, vals, context=None):
+        for record in self.browse(cr, uid, ids, context=context):
+            otif_obj = self.pool.get('is.otif')
+            otif_ids = otif_obj.search(cr, uid, [('order_id','=',record.order_id.id)], context=context)
+            for row in self.browse(cr, uid, otif_ids, context=context):
+                otif_vals={}
+                for k in vals:
+                    v=vals[k]
+                    if (k=="block_total"):
+                        if v:
+                            otif_vals.update({'blocage_total': 1, 'date_blocage_total': None})
+                        else:
+                            otif_vals.update({'blocage_total': 1, 'date_blocage_total': time.strftime('%Y-%m-%d')})
+                    if (k=="block_production"):
+                        if v:
+                            otif_vals.update({'blocage_production': 1, 'date_blocage_prod': None})
+                        else:
+                            otif_vals.update({'blocage_production': 1, 'date_blocage_prod': time.strftime('%Y-%m-%d')})
+                    if (k=="block_delivery"):
+                        if v:
+                            otif_vals.update({'blocage_exped': 1, 'date_blocage_exped': None})
+                        else:
+                            otif_vals.update({'blocage_exped': 1, 'date_blocage_exped': time.strftime('%Y-%m-%d')})
+                otif_obj.write(cr, 1, row.id, otif_vals)
+        res=super(sale_order_blocking_history, self).write(cr, uid, ids, vals, context=context)
+        return res
+sale_order_blocking_history()
+
