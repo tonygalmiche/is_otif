@@ -13,13 +13,13 @@ import netsvc
 # Retourne True si la catégorie parent est "HORS FAMILLE PRODUIT" (id=9)
 def TestCategorie(self, cr, uid, cat):
     parent_id=cat.parent_id
-    id=""
+    code=""
     while True:
         if str(parent_id)=="": break
-        id=parent_id.id
+        code=parent_id.code
         parent_id=parent_id.parent_id
     test=False
-    if id==9: test=True
+    if code=="hfp": test=True
     return test
 
 
